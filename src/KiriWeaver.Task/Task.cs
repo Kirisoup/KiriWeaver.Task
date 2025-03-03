@@ -17,7 +17,21 @@ public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Ta
 	[Required]
 	public required string OutputAssembly { get; set; }
 
-	public override bool Execute() {
+	public override bool Execute() 
+	{
+		if (BuildEngine4.GetRegisteredTaskObject(
+			FileCollector.Key, 
+			RegisteredTaskObjectLifetime.Build) is null)
+		{
+			var collector = new FileCollector(IntermediateAssembly);
+			GC.KeepAlive(collector);
+			BuildEngine4.RegisterTaskObject(
+				FileCollector.Key, 
+				collector, 
+				RegisteredTaskObjectLifetime.Build,
+				allowEarlyCollection: false);
+		}
+
 		var input = File.Exists(IntermediateAssembly)
 			? IntermediateAssembly
 			: InputAssembly;
@@ -37,9 +51,21 @@ public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Ta
 		if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
 		File.Copy(OutputAssembly, IntermediateAssembly, overwrite: true);
-		
+
 		return true;
 	}
 
 	public abstract Result<AssemblyDefinition?, Exception> Weave(string inputAssembly);
+
+}
+
+public sealed class FileCollector(string path) : IDisposable
+{
+	public const string Key = "KiriWeaver.Collect";
+	public string Path { get; } = path;
+
+	~FileCollector() => Dispose();
+	public void Dispose() {
+		if (File.Exists(Path)) File.Delete(Path);
+	}
 }
