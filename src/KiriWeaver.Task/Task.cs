@@ -6,6 +6,8 @@ namespace KiriWeaver.Task;
 
 public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Task
 {
+	public string TaskName { get; } = taskName;
+
 	[Required]
 	public required string InputAssembly { get; set; }
 
@@ -21,9 +23,11 @@ public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Ta
 			: InputAssembly;
 
 		if (!Weave(input).IsOk(out var value, out Exception? error)) {
-			Log.LogError($"{nameof(WeaverTask)} {taskName} failed because: \r\n {error}");
+			Log.LogError($"{nameof(WeaverTask)} {TaskName} failed because: \r\n {error}");
 			return false;
 		}
+
+		if (value is null) return true;
 
 		using (var weaveResult = value) {
 			weaveResult.Write(OutputAssembly);
