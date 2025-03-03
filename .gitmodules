@@ -1,0 +1,3 @@
+[submodule "libs/KiriLib.ErrorHandling"]
+	path = libs/KiriLib.ErrorHandling
+	url = https://github.com/Kirisoup/KiriLib.ErrorHandling.git
