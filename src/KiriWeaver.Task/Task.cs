@@ -17,26 +17,28 @@ public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Ta
 	[Required]
 	public required string OutputAssembly { get; set; }
 
+	public const string WeaveTrace = "WeaveTrace";
+
+	private string GetInputPath(out string traceFile) {
+		var dir = Path.GetDirectoryName(IntermediateAssembly);
+		if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+		traceFile = Path.Combine(dir, WeaveTrace);
+
+		if (!File.Exists(traceFile)) {
+			File.Create(traceFile).Close();
+			return InputAssembly;
+		}
+		if (!File.ReadAllLines(traceFile).Contains(TaskName)) return IntermediateAssembly;
+		File.WriteAllText(traceFile, "");
+		return InputAssembly;
+	}
+
 	public override bool Execute() 
 	{
-		if (BuildEngine4.GetRegisteredTaskObject(
-			FileCollector.Key, 
-			RegisteredTaskObjectLifetime.Build) is null)
-		{
-			var collector = new FileCollector(IntermediateAssembly);
-			GC.KeepAlive(collector);
-			BuildEngine4.RegisterTaskObject(
-				FileCollector.Key, 
-				collector, 
-				RegisteredTaskObjectLifetime.Build,
-				allowEarlyCollection: false);
-		}
+		var inputPath = GetInputPath(out var traceFile);
 
-		var input = File.Exists(IntermediateAssembly)
-			? IntermediateAssembly
-			: InputAssembly;
-
-		if (!Weave(input).IsOk(out var value, out Exception? error)) {
+		if (!Weave(inputPath).IsOk(out var value, out Exception? error)) {
 			Log.LogError($"{nameof(WeaverTask)} {TaskName} failed because: \r\n {error}");
 			return false;
 		}
@@ -47,25 +49,12 @@ public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Ta
 			weaveResult.Write(OutputAssembly);
 		}
 
-		var dir = Path.GetDirectoryName(IntermediateAssembly);
-		if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
 		File.Copy(OutputAssembly, IntermediateAssembly, overwrite: true);
+		File.AppendAllText(traceFile, TaskName);
 
 		return true;
 	}
 
 	public abstract Result<AssemblyDefinition?, Exception> Weave(string inputAssembly);
-
 }
 
-public sealed class FileCollector(string path) : IDisposable
-{
-	public const string Key = "KiriWeaver.Collect";
-	public string Path { get; } = path;
-
-	~FileCollector() => Dispose();
-	public void Dispose() {
-		if (File.Exists(Path)) File.Delete(Path);
-	}
-}
