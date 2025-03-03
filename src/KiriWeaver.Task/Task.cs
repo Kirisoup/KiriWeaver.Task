@@ -50,7 +50,7 @@ public abstract class WeaverTask(string taskName) : Microsoft.Build.Utilities.Ta
 		}
 
 		File.Copy(OutputAssembly, IntermediateAssembly, overwrite: true);
-		File.AppendAllText(traceFile, TaskName);
+		File.AppendAllText(traceFile, TaskName + Environment.NewLine);
 
 		return true;
 	}
